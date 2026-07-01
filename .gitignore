@@ -9,19 +9,29 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+*.egg-info/
+dist/
+build/
 
-# Project specific
+# Project specific (large files)
 data/
 models/
 models_pickles/
 logs/
-outputs/
-*.ipynb_checkpoints/
-.DS_Store
 
-# Jupyter Notebooks
+# Jupyter Notebooks 
 .ipynb_checkpoints/
-*.ipynb
+*.ipynb_checkpoints/
+!*.ipynb
+!notebooks/
+
+outputs/
+outputs/*.png
+outputs/*.jpg
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # IDE
 .vscode/
@@ -31,3 +41,8 @@ outputs/
 
 # Environment variables
 .env
+
+# Logs
+*.log
+*.tmp
+*.bak
