@@ -145,14 +145,61 @@ class AnimalsDataLoader:
                 "Please download the dataset first."
             )
     
-    def get_transforms(self):
-        """Get basic transforms (no augmentation)"""
-        return transforms.Compose([
-            transforms.Resize((self.image_size, self.image_size)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                               std=[0.229, 0.224, 0.225])
-        ])
+    def get_transforms(self, augment_type='none'):
+        """
+        Get transforms based on augmentation type
+        
+        Args:
+            augment_type: 'none', 'basic', 'heavy', 'cutout'
+        
+        Returns:
+            Compose transforms object
+        """
+        
+        if augment_type == 'none':
+            return transforms.Compose([
+                transforms.Resize((self.image_size, self.image_size)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                   std=[0.229, 0.224, 0.225])
+            ])
+        
+        elif augment_type == 'basic':
+            return transforms.Compose([
+                transforms.Resize((self.image_size, self.image_size)),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomRotation(15),
+                transforms.ColorJitter(brightness=0.2, contrast=0.2),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                   std=[0.229, 0.224, 0.225])
+            ])
+        
+        elif augment_type == 'heavy':
+            return transforms.Compose([
+                transforms.Resize((self.image_size, self.image_size)),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomRotation(20),
+                transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3),
+                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                   std=[0.229, 0.224, 0.225])
+            ])
+        
+        elif augment_type == 'cutout':
+            return transforms.Compose([
+                transforms.Resize((self.image_size, self.image_size)),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomRotation(15),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                   std=[0.229, 0.224, 0.225]),
+                transforms.RandomErasing(p=0.3, scale=(0.02, 0.1))
+            ])
+        
+        else:
+            raise ValueError(f"Unsupported augment_type: {augment_type}")
     
     def _stratified_split(self, dataset, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15):
         """
@@ -203,13 +250,15 @@ class AnimalsDataLoader:
         
         return train_indices, val_indices, test_indices
     
-    def load_data(self, val_ratio=0.15, test_ratio=0.15):
+    def load_data(self, val_ratio=0.15, test_ratio=0.15, augment_type='none'):
         """
         Load dataset with stratified train/val/test splits
         
         Args:
             val_ratio: Proportion for validation (default: 0.15)
             test_ratio: Proportion for testing (default: 0.15)
+            augment_type: Type of augmentation to apply ('none', 'basic', 'heavy', 'cutout')
+                          Default: 'none'
         
         Returns:
             train_loader, val_loader, test_loader
@@ -218,38 +267,59 @@ class AnimalsDataLoader:
         random.seed(42)
         torch.manual_seed(42)
         
-        # Get transforms
-        transform = self.get_transforms()
+        # Get transforms - train gets augmentation, test gets none
+        train_transform = self.get_transforms(augment_type)
+        test_transform = self.get_transforms('none')
         
-        # Create full dataset
-        full_dataset = AnimalsDataset(
+        # Create datasets with different transforms
+        # For training: use augmented transforms
+        train_dataset_full = AnimalsDataset(
             self.data_dir, 
-            transform=transform,
+            transform=train_transform,
             use_english_names=self.use_english_names
         )
-        self.classes = full_dataset.classes
+        
+        # For test/validation: use non-augmented transforms
+        test_dataset_full = AnimalsDataset(
+            self.data_dir, 
+            transform=test_transform,
+            use_english_names=self.use_english_names
+        )
+        
+        self.classes = train_dataset_full.classes
         
         # Print class distribution
         print("\nClass Distribution:")
-        distribution = full_dataset.get_class_distribution()
+        distribution = train_dataset_full.get_class_distribution()
         for cls, count in distribution.items():
             print(f"  {cls}: {count} images")
         
-        # Perform stratified split
+        # Perform stratified split using training dataset for indices
         train_ratio = 1 - val_ratio - test_ratio
         train_indices, val_indices, test_indices = self._stratified_split(
-            full_dataset, train_ratio, val_ratio, test_ratio
+            train_dataset_full, train_ratio, val_ratio, test_ratio
         )
         
         # Create subset datasets
-        train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
-        val_dataset = torch.utils.data.Subset(full_dataset, val_indices)
-        test_dataset = torch.utils.data.Subset(full_dataset, test_indices)
+        # Training uses augmented dataset
+        train_dataset = torch.utils.data.Subset(train_dataset_full, train_indices)
+        # Validation and Test use non-augmented dataset
+        val_dataset = torch.utils.data.Subset(test_dataset_full, val_indices)
+        test_dataset = torch.utils.data.Subset(test_dataset_full, test_indices)
         
         print(f"\nData Split (Stratified):")
-        print(f"  Training: {len(train_dataset)} images ({len(train_dataset)/len(full_dataset)*100:.1f}%)")
-        print(f"  Validation: {len(val_dataset)} images ({len(val_dataset)/len(full_dataset)*100:.1f}%)")
-        print(f"  Test: {len(test_dataset)} images ({len(test_dataset)/len(full_dataset)*100:.1f}%)")
+        print(f"  Training: {len(train_dataset)} images ({len(train_dataset)/len(train_dataset_full)*100:.1f}%)")
+        print(f"  Validation: {len(val_dataset)} images ({len(val_dataset)/len(train_dataset_full)*100:.1f}%)")
+        print(f"  Test: {len(test_dataset)} images ({len(test_dataset)/len(train_dataset_full)*100:.1f}%)")
+        
+        # Print augmentation info
+        aug_names = {
+            'none': 'No augmentation',
+            'basic': 'Basic (Flip, Rotation, Color Jitter)',
+            'heavy': 'Heavy (Flip, Rotation, Color Jitter, Affine)',
+            'cutout': 'Cutout (Random Erasing)'
+        }
+        print(f"\n🎯 Augmentation: {aug_names.get(augment_type, augment_type)}")
         
         # Verify stratification
         print("\nClass Distribution per Split:")
@@ -257,7 +327,7 @@ class AnimalsDataLoader:
                                           ("Validation", val_dataset), 
                                           ("Test", test_dataset)]:
             # Get labels from subset
-            labels = [full_dataset.labels[idx] for idx in split_dataset.indices]
+            labels = [train_dataset_full.labels[idx] for idx in split_dataset.indices]
             unique, counts = np.unique(labels, return_counts=True)
             print(f"\n  {split_name}:")
             for class_idx, count in zip(unique, counts):
