@@ -11,6 +11,7 @@ Each model follows the brief requirements:
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.models as models
 
 
 class Model1_BaseCNN(nn.Module):
@@ -72,16 +73,11 @@ class Model2_Dropout25(nn.Module):
         
         # Pooling
         self.pool = nn.MaxPool2d(2, 2)
-        
-        # Dropout layer (25% drop rate)
         self.dropout = nn.Dropout(0.25)
-        
-        # Fully connected layers
         self.fc1 = nn.Linear(128 * 28 * 28, 256)
         self.fc2 = nn.Linear(256, num_classes)
         
     def forward(self, x):
-        # Conv blocks (same as Model 1)
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = self.pool(F.relu(self.conv3(x)))
@@ -223,3 +219,54 @@ class Model5_DataAug(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return x
+    
+
+
+class Model10_TransferLearning(nn.Module):
+    """
+    Model 10: Transfer Learning with ResNet18
+    
+    Uses a model pre-trained on ImageNet and fine-tunes it for 
+    Animals-10 classification.
+    
+    Two approaches:
+    1. Feature Extractor: Freeze all layers, train only the classifier
+    2. Fine-tuning: Unfreeze and train all layers with a low learning rate
+    """
+    
+    def __init__(self, num_classes=10, method='feature_extractor'):
+        super(Model10_TransferLearning, self).__init__()
+        
+        # Load pre-trained ResNet18
+        self.backbone = models.resnet18(pretrained=True)
+        
+        # Method 1: Feature Extractor (freeze everything)
+        if method == 'feature_extractor':
+            for param in self.backbone.parameters():
+                param.requires_grad = False
+        
+        # Replace the final fully connected layer
+        # Original: 1000 classes (ImageNet)
+        # New: 10 classes (Animals-10)
+        num_features = self.backbone.fc.in_features
+        self.backbone.fc = nn.Linear(num_features, num_classes)
+        
+        self.method = method
+        
+    def forward(self, x):
+        return self.backbone(x)
+    
+    def unfreeze(self):
+        """Unfreeze all layers for fine-tuning"""
+        for param in self.backbone.parameters():
+            param.requires_grad = True
+        print("✅ All layers unfrozen for fine-tuning")
+    
+    def freeze(self):
+        """Freeze all layers except classifier"""
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+        # Keep classifier trainable
+        for param in self.backbone.fc.parameters():
+            param.requires_grad = True
+        print("✅ All layers frozen except classifier")
