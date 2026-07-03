@@ -1,5 +1,11 @@
 # CNN Image Classification with Transfer Learning on Animals-10
 
+## 🚀 Live Demo
+
+**Try it yourself:** [🐾 Animal Image Classifier](https://huggingface.co/spaces/dahlia276/animal-image-classifier)
+
+Upload an image and get instant classification with 95% accuracy!
+
 ## Project Overview
 
 This project implements a comprehensive comparison of **6 different CNN architectures** for image classification on the **Animals-10** dataset. The goal was to systematically evaluate various regularization techniques and identify the best-performing model.
@@ -15,10 +21,6 @@ This project implements a comprehensive comparison of **6 different CNN architec
 | Model | Description | Test Accuracy | Best Val Accuracy |
 |-------|-------------|---------------|-------------------|
 | **Model 10** | Transfer Learning (ResNet18) | **95.00%** | **94.50%** |
-| Model 9 | Ensemble-like | 85.20% | 84.80% |
-| Model 8 | L2 Regularization | 83.50% | 83.00% |
-| Model 7 | Wider CNN | 82.10% | 81.70% |
-| Model 6 | Deeper CNN | 81.80% | 81.30% |
 | Model 5 | Data Augmentation | 80.50% | 80.00% |
 | Model 4 | Batch Normalization | 78.30% | 77.80% |
 | Model 3 | Dropout 0.5 | 76.50% | 76.00% |
